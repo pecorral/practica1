@@ -19,7 +19,11 @@ N=5
 
 
 def producir(valor):
-    nuevo_num=valor.value+ random.randint(1,10)
+    r=0
+    if valor.value==-2:
+        #Para asegurarnos de que el valor que produce siempre es no negativo
+        r=2
+    nuevo_num=valor.value+ random.randint(0,10)+r
     valor.value=nuevo_num
     
     
@@ -41,6 +45,7 @@ def coger_menor(valores):
     ind_min=-1
     valor_min=-1
     terminado=True
+    #Filtramos primero los valores de los productores que ya hayan terminado de producir
     while  i<len(valores) and terminado:
         valor_i=valores[i].value
         if valor_i!= -1:
@@ -55,21 +60,27 @@ def coger_menor(valores):
     return (terminado, ind_min,valor_min)
 
 
-def guardar_almacen(almacen, indice, valor_min):
-    almacen[(indice.value)]=valor_min
-    v=indice.value+1
-    indice.value=v
+def guardar_almacen(almacen, indice_alm, valor_min):
+    almacen[(indice_alm.value)]=valor_min
+    v=indice_alm.value+1
+    indice_alm.value=v
     
     
-def organizador(almacen,indice, semaforos_non_empty,semaforos_non_full,valores):    
+def organizador(almacen,indice_alm, semaforos_non_empty,semaforos_non_full,valores):    
     for i in range(NPROD):
+        #Esperamos a que todos los productores hayan producido
         semaforos_non_empty[i].acquire()
     terminado=False
+    #Controlamos que todos los productores hayan terminado de producir mediante un valor booleano
+    #permitiendo así que el número de elementos que produzca cada productor sea diferente. 
+    #Eso sí, habría que modificar el tamaño del array que es el almacen, o definirlo como: 
+    #almacen=Manager.list() y tratarlo como una lista para permitir que sea un tamaño no fijo.
     while not terminado:
         (terminado,ind_min,valor_min)=coger_menor(valores)
         if not terminado:
+            # print(f"Guardamos el valor {valor_min} del productor {ind_min}")
             print(f"Guardamos el valor {valor_min}")
-            guardar_almacen(almacen, indice ,valor_min)
+            guardar_almacen(almacen, indice_alm ,valor_min)
             semaforos_non_full[ind_min].release()
             semaforos_non_empty[ind_min].acquire()
         else:
@@ -106,9 +117,9 @@ def main():
     for p in prodlst + [organiz]:
         p.join()
 
-    print ("Almacen FINAL", almacen[:],"Índice", indice.value)
+    print ("Almacen FINAL", almacen[:],"Índice del almacen", indice.value)
     
-
+    
     
 if __name__ == '__main__':
     main()
