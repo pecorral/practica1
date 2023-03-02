@@ -9,7 +9,7 @@ Created on Thu Feb 23 09:07:19 2023
 from multiprocessing import Process, Manager
 from multiprocessing import BoundedSemaphore, Semaphore #,Lock
 from multiprocessing import current_process
-from multiprocessing import Value, Array
+from multiprocessing import Value
 # from time import sleep
 import random
 
