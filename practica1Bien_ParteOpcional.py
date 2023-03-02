@@ -7,7 +7,7 @@ Created on Tue Feb 28 18:29:51 2023
 """
 
 from multiprocessing import Process
-from multiprocessing import Semaphore #BoundedSemaphore , Lock
+from multiprocessing import Semaphore, BoundedSemaphore #, Lock
 from multiprocessing import current_process
 from multiprocessing import Value, Array
 from time import sleep
@@ -15,7 +15,8 @@ import random
 
 
 NPROD=6
-N=5
+N=10        #Numero de elementos que tiene que producir cada productor
+K=2         #Tamaño de los buffer
 
 
 def delay(factor = 3):
@@ -33,24 +34,30 @@ def producir_y_guardar(valor, array, i):
     
     return valor
     
-def productor(array, nonEmpty):
+def productor(array, nonEmpty, nonFull):
     valor=0
     
     for i in range(N):
         
-        valor=producir_y_guardar(valor, array,i)
+        nonFull.acquire()
+        
+        valor=producir_y_guardar(valor, array,(i%K))
         
         print(f'Produciendo {current_process().name} el valor {valor}', flush=True)
         
         
         nonEmpty.release()
-        
+
+    nonFull.acquire()
+    
+    array[(N%K)]=-1
+    
+    print(f'Prductor {current_process().name} ha TERMINADO de producir', flush=True)
+    
+    
+    nonEmpty.release()
         # delay(6)
 
-"""
-NO SÉ POR QUÉ NO ME PERMITE HACER UN DELAY PARA QUE NO SE PRODUZCAN TODOS LOS ELEMENTOS ANTES DE QUE SE ALMACENEN
-"""
-        
 
 
 def coger_menor(indices_array_prod, array_prods):
@@ -61,30 +68,32 @@ def coger_menor(indices_array_prod, array_prods):
     #Filtramos aquellos productores que ya hayan terminado
     while i<NPROD and terminado:
         ind_i=indices_array_prod[i].value
-        
-        if ind_i!=N:
+        valor_i=array_prods[i][ind_i]
+        if valor_i!=-1:
             terminado=False
             prod_min=i
-            valor_min=array_prods[i][ind_i]
+            valor_min=valor_i
         i+=1
     
     for j in range(i,NPROD):
         ind_j=indices_array_prod[j].value
-        if ind_j!=N:
-            valor_j=array_prods[j][ind_j]
-            if valor_j<valor_min:
+        valor_j=array_prods[j][ind_j]
+        if valor_j>=0 and valor_j<valor_min:
                 valor_min, prod_min=valor_j, j
     return (terminado, prod_min,valor_min)
         
         
     
-def guardar_almacen(almacen, indice_alm ,valor_min):
+def guardar_almacen_y_actualizar_indices(almacen, indice_alm ,valor_min, indices_array_prod, prod_min):
     almacen[(indice_alm.value)]=valor_min
+    #Actualizamos el indice del almacen
     v=indice_alm.value+1
     indice_alm.value=v
-        
+    #Actualizamos el indice del productor que ha producido el valor minimo (prod_min)
+    w=(indices_array_prod[prod_min].value+1)%K
+    indices_array_prod[prod_min].value=w 
 
-def organizador(almacen, indice_alm, semaforos_non_empty, indices_array_prod, array_prods):
+def organizador(almacen, indice_alm, semaforos_non_empty,semaforos_non_full, indices_array_prod, array_prods):
     
     for j in range(NPROD):
         semaforos_non_empty[j].acquire()
@@ -99,14 +108,13 @@ def organizador(almacen, indice_alm, semaforos_non_empty, indices_array_prod, ar
             
             print(f"Guardamos el valor {valor_min} del productor {prod_min}", flush=True)
             
-            guardar_almacen(almacen, indice_alm ,valor_min)
+            guardar_almacen_y_actualizar_indices(almacen, indice_alm ,valor_min, indices_array_prod, prod_min)
+
+            semaforos_non_full[prod_min].release()
             
-            v=indices_array_prod[prod_min].value+1
-            indices_array_prod[prod_min].value=v
-            if v<N:
-                semaforos_non_empty[prod_min].acquire()
+            semaforos_non_empty[prod_min].acquire()
             
-            # delay()
+
         else:
             print("Hemos terminado")
 
@@ -121,11 +129,11 @@ def main():
     
     indices_array_prod=[Value('i', 0) for i in range(NPROD)]
     
-    array_prods=[Array('i',N) for i in range(NPROD)]
+    array_prods=[Array('i',K) for i in range(NPROD)]
     
     #Los inicializamos con valor -2 en todas sus posiciones
     for array in array_prods:
-        for i in range(N):
+        for i in range(K):
             array[i]=-2
     
     print("Los buffers de los productores INICIALES:")
@@ -135,14 +143,16 @@ def main():
         
     semaforos_non_empty=[Semaphore(0) for i in range(NPROD)]
     
+    semaforos_non_full=[BoundedSemaphore(K) for i in range(NPROD)]
+    
     prodlst = [ Process(target=productor,
                         name=f'prod_{i}',
-                        args=(array_prods[i],semaforos_non_empty[i]))
+                        args=(array_prods[i],semaforos_non_empty[i],semaforos_non_full[i]))
                 for i in range(NPROD) ]
     
     organiz=Process(target=organizador,
                       name="merger",
-                      args=(almacen, indice_alm, semaforos_non_empty, indices_array_prod, array_prods))
+                      args=(almacen, indice_alm, semaforos_non_empty, semaforos_non_full, indices_array_prod, array_prods))
 
     
     for p in prodlst + [organiz]:
