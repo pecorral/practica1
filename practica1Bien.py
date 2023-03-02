@@ -119,7 +119,7 @@ def main():
         p.join()
 
 
-    print ("Almacen FINAL", almacen[:])
+    print ("Almacen FINAL", almacen[:], "Contiene", len(almacen), "elementos")
     
     
 if __name__ == '__main__':
