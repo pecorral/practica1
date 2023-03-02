@@ -19,7 +19,7 @@ N=5
 
 
 def delay(factor = 3):
-    sleep(random()/factor)
+    sleep(random.random()/factor)
 
 
 
@@ -27,6 +27,7 @@ def producir_y_guardar(valor, array, i):
     a_sumar=random.randint(1,10)
     
     valor+=a_sumar
+    delay(6)
 
     array[i]=valor
     
@@ -41,13 +42,15 @@ def productor(array, nonEmpty):
         
         print(f'Produciendo {current_process().name} el valor {valor}', flush=True)
         
+        
         nonEmpty.release()
-
+        
+        # delay(6)
 
 """
 NO SÉ POR QUÉ NO ME PERMITE HACER UN DELAY PARA QUE NO SE PRODUZCAN TODOS LOS ELEMENTOS ANTES DE QUE SE ALMACENEN
 """
-        # delay(6)
+        
 
 
 def coger_menor(indices_array_prod, array_prods):
